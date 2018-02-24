@@ -83,7 +83,7 @@ http.createServer(function(req, res)
       return res:error((err.message or tostring(err)) .. "\n")
     end
     if stat.type ~= 'file'    then
-      return res:notFound("Requested url is not a file\n")
+      return res:notFound(req.uri.pathname,"Requested url is not a file\n")
     end
 
     res:writeHead(200, {

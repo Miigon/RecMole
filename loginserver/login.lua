@@ -1,10 +1,12 @@
 -- Login Server
 
+CONN_OFFI_LS = true
+
 local net = require('net')
 local lpp = require "./loginpktprocess"
 local ce
 local ccc
---[
+if CONN_OFFI_LS then
 ce = net.createConnection(1863, '123.206.131.236', function (err)
 	  if err then error(err) end
 
@@ -17,7 +19,7 @@ ce = net.createConnection(1863, '123.206.131.236', function (err)
 	  end)
 	  
 	end)
-	--]]
+end
 local policy_file = "\
 <?xml version=\"1.0\"?><!DOCTYPE cross-domain-policy><cross-domain-policy>\
 <allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>\000\

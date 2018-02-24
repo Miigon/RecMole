@@ -1,5 +1,7 @@
 -- GameServer
 
+CONN_OFFI_GS = true
+
 gs = require('core').Object:extend()
 local net = require('net')
 
@@ -10,7 +12,7 @@ local policy_file = "\
 
 local ce
 local ccc
-
+if CONN_OFFI_GS then
 ce = net.createConnection(1865, '123.206.131.236', function (err)
 	  if err then error(err) end
 
@@ -22,6 +24,7 @@ ce = net.createConnection(1865, '123.206.131.236', function (err)
 	  end)
 	  
 end)
+end
 
 function gs:initialize(port)
 	local server = net.createServer(function(client)
