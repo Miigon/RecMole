@@ -18,7 +18,7 @@ if CONN_OFFI_LS then
         --p("srv->cli",data)
     end)
 
-	end)
+    end)
 end
 local policy_file = "\
 <?xml version=\"1.0\"?><!DOCTYPE cross-domain-policy><cross-domain-policy>\
@@ -33,15 +33,15 @@ local server = net.createServer(function(client)
         client:close()
     end)
     client:on("data",function(data)
-		--p("cli->srv",data)
-		if data == "<policy-file-request/>\000" then
-			--print("Login server policy file requested")
-			client:write(policy_file)
-			return
-		end
-		ce:write(data)
-		--lpp.parse(data,client)
-	end)
+        --p("cli->srv",data)
+        if data == "<policy-file-request/>\000" then
+            --print("Login server policy file requested")
+            client:write(policy_file)
+            return
+        end
+        ce:write(data)
+        --lpp.parse(data,client)
+    end)
     --[[
     client:on("end",function()
         print("Login server client disconnected")
