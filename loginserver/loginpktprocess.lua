@@ -8,11 +8,11 @@ local offset = 17
 
 function lpp.makeHead(cmdId,userId,errorId,bodylen)
     local head = buffer.Buffer:new(offset)
-    head:writeUInt32BE(1,offset+bodylen)
-    head:writeUInt8(5,0)
-    head:writeUInt32BE(6,cmdId)
-    head:writeUInt32BE(10,userId)
-    head:writeUInt32BE(14,errorId)
+    head:writeUInt32BE(1,offset+bodylen) --PkgLen
+    head:writeUInt8(5,0) --Version
+    head:writeUInt32BE(6,cmdId) --Command
+    head:writeUInt32BE(10,userId) --UserID
+    head:writeUInt32BE(14,errorId) --Result
     return tostring(head)
 end
 
@@ -54,16 +54,16 @@ function lpp.makeGoodSrvList(servers)
     return lpp.makeSrvList(servers) .. tostring(meta)
 end
 
-function lpp.parse(data,client)
+function lpp.parse(data,socket)
     local buf = buffer.Buffer:new(data)
     local length = math.min(buf:readUInt32BE(1),buf.length)
     if length < 17 then return end
     if buf:readUInt8(5) ~= 1 then return end
     local cmdId = buf:readUInt32BE(6)
     local userId = buf:readUInt32BE(10)
-    if buf:readInt32BE(14) ~= 0 then return end
+    if buf:readUInt32BE(14) ~= 0 then return end
     local handler = lpp.handler[cmdId]
-    if handler then handler(client,userId,buf,length)
+    if handler then handler(socket,userId,buf,length)
     else
         print("\27[31mUnhandled login packet:",cmdId,"\27[0m")
         --p(data)
@@ -77,30 +77,30 @@ lpp.handler[101] = function()
 end
 
 -- CMD_LOGIN
-lpp.handler[103] = function(client,userId,buf,length)
+lpp.handler[103] = function(socket,userId,buf,length)
     if length < 147 then return end
     local password = buf:toString(offset+1,offset+32)
     local session = "0000000000000000"
     local body = lpp.makeLoginBody(session)
-    client:write(lpp.makeHead(103,userId,0,#body))
-    client:write(body)
+    socket:write(lpp.makeHead(103,userId,0,#body))
+    socket:write(body)
     print("\27[1mLogin:",userId..",pass "..password..",session "..session.."\27[0m")
 end
 
 -- CMD_GET_GOOD_SERVER_LIST
-lpp.handler[105] = function(client,userId,buf,length)
+lpp.handler[105] = function(socket,userId,buf,length)
     local session = buf:toString(offset+1,offset+16)
     local body = lpp.makeGoodSrvList(srv.getGoodSrvList())
-    client:write(lpp.makeHead(105,userId,0,#body))
-    client:write(body)
+    socket:write(lpp.makeHead(105,userId,0,#body))
+    socket:write(body)
 end
 
 -- CMD_GET_SERVER_LIST
-lpp.handler[106] = function(client,userId,buf,length)
+lpp.handler[106] = function(socket,userId,buf,length)
     local session = buf:toString(offset+1,offset+16)
     local body = lpp.makeSrvList(srv.getServerList())
-    client:write(lpp.makeHead(106,userId,0,#body))
-    client:write(body)
+    socket:write(lpp.makeHead(106,userId,0,#body))
+    socket:write(body)
 end
 
 return lpp
