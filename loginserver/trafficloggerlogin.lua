@@ -1,21 +1,18 @@
 -- Login Server
 
-CONN_OFFI_LS = false
-
 local net = require "net"
 local lpp = require "./loginpktprocess"
 local ce
 local ccc
-if CONN_OFFI_LS then
+if true then
     ce = net.createConnection(1863, '123.206.131.236', function (err)
     if err then error(err) end
 
     print("Connected to official login server")
 
-    -- Send the server's response to stdout
-    ce:on("data",function(data) -- or 'client:pipe(process.stdout)'
-        ccc:write(data)
-        --p("srv->cli",data)
+    ce:on("data",function(data)
+        --ccc:write(data)
+        ccc:write(data:gsub("123.206.131.236","127.0.0.1\0\0\0\0\0\0"))
     end)
 
     end)
@@ -33,23 +30,13 @@ local server = net.createServer(function(client)
         client:close()
     end)
     client:on("data",function(data)
-        --p("cli->srv",data)
         if data == "<policy-file-request/>\000" then
             --print("Login server policy file requested")
             client:write(policy_file)
             return
         end
-        if conf.passthru then
-            ce:write(data)
-        else
-            lpp.parse(data,client)
-        end
+        ce:write(data)
     end)
-    --[[
-    client:on("end",function()
-        print("Login server client disconnected")
-    end)
-    ]]
     ccc = client
 end)
 
@@ -60,4 +47,4 @@ end)
 
 server:listen(conf.login_port)
 
-print("\27[36mLogin server started on \27[1mtcp://localhost:"..conf.login_port.."/\27[0m")
+print("\27[36mTrafficLogger Login server started on \27[1mtcp://localhost:"..conf.login_port.."/\27[0m")

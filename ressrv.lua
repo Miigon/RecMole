@@ -10,7 +10,6 @@ function getType(path)
     return mimes[path:lower():match("[^.]*$")] or mimes.default
 end
 
--- Monkey patch in a helper
 function Response:notFound(path,reason)
     local req
     local resp = self
@@ -57,7 +56,6 @@ function Response:notFound(path,reason)
     req:done()
 end
 
--- Monkey patch in another
 function Response:error(reason)
     self:writeHead(500, {
         ["Content-Type"] = "text/plain",
@@ -68,9 +66,16 @@ end
 
 http.createServer(function(req, res)
     req.uri = url.parse(req.url)
-    local path = root .. req.uri.pathname
+    local dest = req.uri.pathname
+    if dest == "/config/Server.xml" and conf.res_official_address then
+        dest = "/config/Serveroffi.xml"
+    end
+    if dest == "/dll/ClientCommonDLL.swf" and conf.res_no_decrypt then
+        dest = "/dll/ClientCommonDLLoffi.swf"
+    end
+    local path = root .. dest
     
-    print("\27[1;37mAccess",path,"\27[0m")
+    print("\27[1;37mAccess",dest,"\27[0m")
     fs.stat(path, function (err, stat)
         if err then
             if err.code == "ENOENT" then

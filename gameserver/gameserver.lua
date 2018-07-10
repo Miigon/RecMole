@@ -1,8 +1,9 @@
 -- GameServer
 
-CONN_OFFI_GS = true
+CONN_OFFI_GS = false
 
 gs = require "core".Object:extend()
+local gpp = require "./gamepktprocess"
 local net = require "net"
 
 local policy_file = "\
@@ -12,7 +13,7 @@ local policy_file = "\
 
 local ce
 local ccc
-if CONN_OFFI_GS then
+if conf.passthru then
     ce = net.createConnection(1865, '123.206.131.236', function (err)
         if err then error(err) end
 
@@ -30,12 +31,15 @@ function gs:initialize(port)
         print "Someone Connected to gameserver."
         client:on("data",function(data)
             if data == "<policy-file-request/>\000" then
-                --print("Login server policy file requested")
                 client:write(policy_file)
                 return
             end
-            p("Game cli->srv",data)
-            ce:write(data)
+            --p("Game cli->srv",data)
+            if conf.passthru then
+                ce:write(data)
+            else
+                gpp.parse(data,client)
+            end
         end)
         ccc = client
     end)
