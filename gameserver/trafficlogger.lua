@@ -23,7 +23,7 @@ function gs:initialize(port)
         p("Session file:",sfile)
         fd = io.open("sessionlog/"..sfile, "w+")
         local tmr = timer.setInterval(5000,function()fd:flush()end)
-        ce = net.createConnection(1865, '123.206.131.236', function (err)
+        ce = net.createConnection(1201, '123.206.131.236', function (err)
             if err then error(err) end
     
             print("Connected to official game server")
