@@ -70,7 +70,7 @@ http.createServer(function(req, res)
     if dest == "/config/Server.xml" and conf.res_official_address then
         dest = "/config/Serveroffi.xml"
     end
-    if dest == "/dll/ClientCommonDLL.swf" and conf.res_no_decrypt then
+    if dest == "/dll/ClientCommonDLL.swf" and not conf.res_bypass_encrypt then
         dest = "/dll/ClientCommonDLLoffi.swf"
     end
     local path = root .. dest

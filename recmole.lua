@@ -5,15 +5,15 @@ local conf={
     loginip_port = 32401,
     login_server_address = "127.0.0.1:32402",
     login_port = 32402,
-    gameserver_port = 1865,--32410,
+    gameserver_port = 32410,--32410, 1201 for official
     passthru = false,
     res_official_address = false,
-    res_no_decrypt = true,
-    trafficlogger = true,
+    res_bypass_encrypt = true,
+    trafficlogger = false,
 }
 _G.conf = conf
 
-require "./buffer_write"
+require "./buffer_extension"
 require "./ressrv"
 require "./loginip"
 local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
