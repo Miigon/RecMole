@@ -1,7 +1,7 @@
 -- this program is part of `The RecMole Project`
 -- source code published under GNU GPLv3
 -- information above should not be deleted
-require "./buffer_extension"
+require "../buffer_extension"
 local buffer = require "buffer"
 local SRV = 1;local CLI = 2
 local MAGIC_NUMBER = 1;local TIMESTAMP = 2;local PACKET_DATA = 3

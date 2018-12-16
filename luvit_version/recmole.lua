@@ -1,6 +1,7 @@
 -- RecMole Main
 
 local conf={
+    res_dir = "../res",
     ressrv_port = 32400,
     loginip_port = 32401,
     login_server_address = "127.0.0.1:32402",
