@@ -2,7 +2,7 @@ local http = require "http"
 local url = require "url"
 local fs = require "fs"
 local Response = http.ServerResponse
-local root = "res"
+local root = conf.res_dir
 local mimes = require "./mimes"
 mimes.default = "application/octet-stream"
 

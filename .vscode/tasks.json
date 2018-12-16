@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/csharp_version/gameserver/gameserver.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

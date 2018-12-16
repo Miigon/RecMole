@@ -3,6 +3,7 @@
 local gpp = {}
 gpp.handler = {}
 local buffer = require "buffer"
+require "../easybytewrite"
 local offset = 17 -- 包头长度
 
 function gpp.makeHead(cmdId,userId,errorId,bodylen)
@@ -21,66 +22,11 @@ function gpp.makeAllNpcJob(userid,npcid)
     return tostring(buf)
 end
 
---[[
+
 function gpp.makeOneUser(userid,mapid,type)
-    local buf = buffer.Buffer:new(243)
-    buf:wuint(1,userid) --userid
-    buf:write(5,"RecMole",16) --nick
-    buf:wuint(21,0) --parentid
-    buf:wuint(25,0) --childcount
-    buf:wuint(29,0) --newchildcount
-    buf:wuint(33,16766720) --color
-    buf:wuint(37,0) --vip
-    buf:wuint(41,mapid) --MapId
-    buf:wuint(45,type) --MapType
-    buf:wbyte(49,0) --status
-    buf:wuint(50,0) --action
-    buf:wuint(54,0) --Pet_action
-    buf:wbyte(58,0) --Direction
-    buf:wuint(59,510) --PosX
-    buf:wuint(63,350) --PosY
-    buf:wuint(67,1) --Grid
-    buf:wuint(71,0) --Action2
-    buf:wuint(75,0) --PetID
-    buf:write(79,"",16) --PetName
-    buf:wuint(95,0) --PetColor
-    buf:wbyte(99,0) --PetLevel
-    buf:wuint(100,0) --Reserved1
-    buf:wuint(104,0) --PetSick
-    buf:wuint(108,0) --skill_Fire
-    buf:wuint(112,0) --skill_Water
-    buf:wuint(116,0) --skill_Wood
-    buf:wuint(120,0) --Skill_Type
-    buf:wuint(124,0) --Skill_Value
-    buf:wbyte(128,0) --item1
-    buf:wbyte(129,0) --item2
-    buf:wbyte(130,0) --item3
-    buf:wuint(131,0) --Pet_cloth
-    buf:wuint(135,0) --Pet_honor
-    buf:wuint(139,0) --Can_Fly
-    buf:write(143,"",32) --Activity
-    --Dragon
-    buf:wuint(175,0) --id
-    buf:write(179,"",16) --nickname
-    buf:wuint(195,0) --growth
-    buf:wuint(199,0) --digTreasureLvl
-    buf:wuint(203,0) --hasCar
-    --CAR INFO IF NOT 0
-    buf:wuint(207,0) --hasAnimal
-    --ANIMAL INFO IF NOT 0
-    buf:wuint(211,0) --roleType
-    buf:wbyte(215,6) --ItemCount
-    --ITEM INFO IF NOT 0
-    buf:wuint(216,12059)
-    buf:wuint(220,12645)
-    buf:wuint(224,12646)
-    buf:wuint(228,12735)
-    buf:wuint(232,12750)
-    buf:wuint(236,14730)
-    buf:wuint(240,0) --superGuide
-    return tostring(buf)
+    return gpp.makeAllSceneUser(userid,mapid,type):sub(5,-1)
 end
-]]
+
 
 function gpp.makeAllSceneUser(userid,mapid,type)
     local buf = buffer.Buffer:new(247)
@@ -144,21 +90,19 @@ function gpp.makeAllSceneUser(userid,mapid,type)
     return tostring(buf)
 end
 
-function gpp.makeTextNotice(type,map,maptype,grid,userid,nick,icon,schema,pic,infomsg)
-    local buf = buffer.Buffer:new(52+#infomsg)
-    buf:wuint(1,type)
-    buf:wuint(5,map)
-    buf:wuint(9,maptype)
-    buf:wuint(13,grid)
-    buf:wuint(17,userid)
-    buf:write(21,nick,16)
-    buf:wuint(37,icon)
-    buf:wuint(41,schema)
-    buf:wuint(45,pic)
-    buf:wuint(49,#infomsg)
-    buf:write(53,infomsg,#infomsg)
-    return tostring(buf)
-    -- Not finished yet
+function gpp.sendTextNotice(socket,type,map,maptype,grid,userid,nick,icon,schema,pic,infomsg)
+    socket:write(gpp.makeHead(10003,userid,0,52+#infomsg))
+    socket:wuint(type)
+    socket:wuint(map)
+    socket:wuint(maptype)
+    socket:wuint(grid)
+    socket:wuint(userid)
+    socket:wstr(nick,16)
+    socket:wuint(icon)
+    socket:wuint(schema)
+    socket:wuint(pic)
+    socket:wuint(#infomsg)
+    socket:wstr(infomsg,#infomsg)
 end
 
 function gpp.makeLoginOnlineSre(userId) -- 实际发送的是User info
@@ -233,14 +177,21 @@ function gpp.makeIsFinishedSth(userid,type)
     return tostring(buf)
 end
 
-function gpp.makeChat(userId,towho,str)
-    local buf = buffer.Buffer:new(28+#str)
+function gpp.sendChat(userId,socket,towho,str)
     print("聊天频道：",str)
-    buf:wuint(1,0)
-    buf:write(5,"RecMole",16)
-    buf:wuint(21,0) --friend
-    buf:wuint(25,#str) --msglen
-    buf:write(29,str,#str) --msglen
+    socket:write(gpp.makeHead(302,userId,0,28+#str))
+    socket:wuint(0)
+    socket:wstr("RecMole",16)
+    socket:wuint(0) --friend
+    socket:wuint(#str) --msglen
+    socket:wstr(str,#str)
+end
+
+function gpp.makeAction(userid,action,direction)
+    local buf = buffer.Buffer:new(10)
+    buf:wuint(1,userid)
+    buf:wuint(5,action)
+    buf:wbyte(9,direction)
     return tostring(buf)
 end
 
@@ -354,7 +305,7 @@ function gpp.makeLimitInfo(userid,list)
     return tostring(buf)
 end
 local databuf = ""
-function gpp.parse(data,socket)
+function gpp.parse(data,socket,user)
     local buf = buffer.Buffer:new(data)
     local length = math.min(buf:ruint(1),buf.length)
     if length < 17 then return end
@@ -365,10 +316,10 @@ function gpp.parse(data,socket)
     if buf:ruint(14) ~= 0 then return end -- Result，未知
     local handler = gpp.handler[cmdId]
     if handler then
-        handler(socket,userId,buf,length)
+        handler(socket,userId,buf,length,user)
         --p(getmetatable(socket))
     else
-        print("\27[31mUnhandled packet:",cmdId,"\27[0m")
+        print("\27[31mUnhandled packet:",cmdId,"with length",length  ,"\27[0m")
         --p(data)
     end
     
@@ -395,9 +346,7 @@ gpp.handler[201] = function(socket,userId,buf,length)
     local body = gpp.makeLoginOnlineSre(userId)
     socket:write(gpp.makeHead(201,userId,0,#body))
     socket:write(body)
-    body = gpp.makeTextNotice(0,0,0,0,userId,"RECMOLE",0,0,0,"测试 RecMole 连接性能" )
-    socket:write(gpp.makeHead(10003,userId,0,#body))
-    socket:write(body)
+    body = gpp.sendTextNotice(socket,0,0,0,0,userId,"RECMOLE",0,0,0,"测试 RecMole 连接性能" )
 
 end
 
@@ -467,22 +416,27 @@ gpp.handler[233] = function(socket,userId,buf,length)
 end
 
 --离开地图
-gpp.handler[402] = function(socket,userId,buf,length)
+gpp.handler[402] = function(socket,userId,buf,length,user)
+    local map = user[map]
     local body = gpp.makeLeaveMap({userId})
-    socket:write(gpp.makeHead(402,userId,0,#body))
-    socket:write(body)
+    local function when402(user)
+        --user.map == 
+    end
+    
+    gpp.broadcast(gpp.makeHead(402,userId,0,#body))
+    gpp.broadcast(body)
 end
 
 --进入地图
-gpp.handler[401] = function(socket,userId,buf,length)
+gpp.handler[401] = function(socket,userId,buf,length,user)
     local newmapid = buf:ruint(offset+1)
     local newmaptype = buf:ruint(offset+5)
     local oldmapid = buf:ruint(offset+9)
     local oldmaptype = buf:ruint(offset+13)
     local newgrid = buf:ruint(offset+17)
     local oldgrid = buf:ruint(offset+21)
-
-    local body = gpp.makeAllSceneUser(userId,newmapid,newmaptype):sub(5,-1)
+    user.map = newmapid
+    local body = gpp.makeOneUser(userId,newmapid,newmaptype)
     socket:write(gpp.makeHead(401,userId,0,#body))
     socket:write(body)
 end
@@ -502,8 +456,26 @@ gpp.handler[302] = function(socket,userId,buf,length)
     local towho = buf:ruint(offset+1)
     local msglen = buf:ruint(offset+5)
     local str = buf:toString(offset+9,offset+9+msglen-2)
-    local body = gpp.makeChat(userId,towho,str)
-    socket:write(gpp.makeHead(302,userId,0,#body))
+    gpp.sendChat(userId,socket,towho,str)
+end
+
+--查看背包
+gpp.handler[507] = function(socket,userId,buf,length)
+    local userid = buf:ruint(offset+1)
+    local type = buf:ruint(offset+5)
+    local flag = buf:rbyte(offset+9)
+    local newtype = buf:rbyte(offset+10)
+    p(userid,type,flag,newtype)
+    socket:write(gpp.makeHead(507,userId,0,1))
+    socket:write("\0")
+end
+
+--动作
+gpp.handler[305] = function(socket,userId,buf,length)
+    local action = buf:ruint(offset+1)
+    local direction = buf:rbyte(offset+5)
+    local body = gpp.makeAction(userId,action,direction)
+    socket:write(gpp.makeHead(305,userId,0,#body))
     socket:write(body)
 end
 
