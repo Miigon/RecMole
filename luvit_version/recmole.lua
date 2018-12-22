@@ -9,15 +9,16 @@ local conf={
     gameserver_port = 32410,--32410, 1201 for official
     passthru = false,
     res_official_address = false,
-    res_bypass_encrypt = true,
-    trafficlogger = false,
+    res_bypass_encrypt = false,
+    trafficlogger = true,
 }
 _G.conf = conf
 
 require "./buffer_extension"
 require "./ressrv"
-require "./loginip"
-local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
+--require "./loginip"
 
-local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
-gs.GameServer:new()
+--local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
+
+--local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
+--gs.GameServer:new()
