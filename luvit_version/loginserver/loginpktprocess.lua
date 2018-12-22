@@ -40,6 +40,23 @@ local function createSrvList(buf,srvs)
     end
 end
 
+function lpp.sendTextInfoBroadcast(socket,userid,msg) -- not used
+    socket:write(lpp.makeHead(1414,userid,0,8+#msg))
+    socket:wuint(0)
+    socket:wuint(#msg)
+    socket:wstr(msg,#msg)
+end
+
+function lpp.sendAuthCode(socket,userid,flag,codeid,codedata)
+    socket:write(lpp.makeHead(101,userid,0,24+#codedata))
+    socket:wuint(flag)
+    socket:wstr(codeid,16)
+    socket:wuint(#codedata)
+    socket:wstr(codedata,#codedata)
+end
+
+--local aut = require("fs").readFileSync("upper.gif")
+
 function lpp.makeSrvList(servers)
     local list = buffer.Buffer:new(#servers * 30 + 4)
     createSrvList(list,servers)
@@ -71,9 +88,11 @@ function lpp.parse(data,socket)
     
 end
 
+local aut = require("fs").readFileSync("upper.gif")
+
 -- CMD_GET_AUTHCODE
 lpp.handler[101] = function()
-
+    p"getauth"
 end
 
 -- CMD_LOGIN
@@ -82,6 +101,7 @@ lpp.handler[103] = function(socket,userId,buf,length)
     local password = buf:toString(offset+1,offset+32)
     local session = "0000000000000000"
     local body = lpp.makeLoginBody(session)
+    --lpp.sendAuthCode(socket,userId,1,"0123456789abcdef",aut)
     socket:write(lpp.makeHead(103,userId,0,#body))
     socket:write(body)
     print("\27[1mLogin:",userId..",pass "..password..",session "..session.."\27[0m")
@@ -102,5 +122,7 @@ lpp.handler[106] = function(socket,userId,buf,length)
     socket:write(lpp.makeHead(106,userId,0,#body))
     socket:write(body)
 end
+
+
 
 return lpp
