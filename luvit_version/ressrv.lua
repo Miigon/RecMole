@@ -24,6 +24,11 @@ local special_redirect_rules = {
     ["/missinglist.txt"] = no_redirect,
 }
 
+local token_initial_life = 5*60 -- seconds
+local flush_time_interval = 20 * 1000 -- milliseconds
+local token_cleaner_interval = 5 * 60 * 1000 -- milliseconds
+local keepalive_set_life = token_initial_life -- seconds
+
 function getType(path)
     return mimes[path:lower():match("[^.]*$")] or mimes.default
 end
@@ -46,6 +51,14 @@ function Response:error(reason)
     self:write(reason)
 end
 
+function Response:okText(text)
+    self:writeHead(200, {
+        ["Content-Type"] = "text/plain",
+        ["Content-Length"] = #text
+    })
+    self:write(text)
+end
+
 -- duplist and missinglist
 local duplist = {}
 missinglist,err = io.open("missinglist.txt","a+");
@@ -62,11 +75,79 @@ end
 print(ln.." lines of missinglist data has been loaded.")
 missinglist:seek("end");
 
+function tokenCharFunction()
+    local x = math.random(1,52)
+    if x <= 26 then --lowercase
+        return string.char(96 + x)
+    else -- uppercase
+        return string.char(64 + x)
+    end
+end
+
+function generateToken()
+    local token = ""
+    for i=0,16 do
+        token = token .. tokenCharFunction()
+    end
+    return token
+end
+
+function verifySession(session)
+    return session and os.time() < session.start + session.life
+end
+
+function refleshSession(session)
+    session.life = keepalive_set_life
+end
+
+local userList = {[70178614]={amount=1223}}
+local sessionList = {}
+
 http.createServer(function(req, res)
-    req.uri = url.parse(req.url)
+    req.uri = url.parse(req.url,true)
     local dest = req.uri.pathname
     if normalizePath(dest):find("%.%.") ~= nil then --avoid path traversal vulnerability
         res:error("Invaild path. " .. msg_suffix)
+        return
+    end
+    -- RecMole API
+    if dest:sub(1,11) == "/recmoleapi" then
+        if dest == "/recmoleapi/new_token" then -- dont need a query
+            local token
+            repeat token = generateToken() until sessionList[token] == nil end
+            sessionList[token] = {start = os.time(),life = token_initial_life}
+            res:okText(tostring(token))
+        else -- need a query
+            local query = req.uri.query
+            if not query then 
+                return res:error("Invaild query.")
+            end
+            if dest == "/recmoleapi/get_amount_by_id" then
+                local id = tonumber(query["id"])
+                if type(id) ~= "number" then 
+                    return res:error("Invaild query.")
+                end
+                local user = userList[id]
+                if user == nil then 
+                    return res:error("User not found.")
+                end
+                res:okText(tostring(user.amount))
+            elseif dest == "/recmoleapi/reflesh_session" then
+                local token = tostring(query["token"])
+                if type(token) ~= "string" then 
+                    return res:error("Invaild query.")
+                end
+                local session = sessionList[token]
+                if not verifySession(session) then
+                    return res:error("Invaild token.")
+                end
+                refleshSession(session)
+
+                res:okText(tostring(user.amount))
+            end
+        else
+            res:error("Invaild API.")
+        end
         return
     end
     local path = joinPath(root,dest)
@@ -113,5 +194,7 @@ http.createServer(function(req, res)
     end
 end):listen(conf.ressrv_port)
 
-timer.setInterval(20*1000,function()missinglist:flush()end) -- 20秒存一次盘
+math.randomseed(os.time())
+
+timer.setInterval(flush_time_interval,function()missinglist:flush()end) -- 20秒存一次盘
 print("\27[36mRedirect resource server started on \27[1mhttp://localhost:"..conf.ressrv_port.."/\27[0m")
