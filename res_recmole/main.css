@@ -1,0 +1,25 @@
+p{
+    font-size: 14px;
+}
+
+.start-button {
+    height: 100px;
+    width: 500px;
+    background-color: powderblue;
+    font-size: 30px;
+}
+
+.status-text {
+    font-size: 18px;
+    color: green;
+}
+
+.about-text {
+    color: gray;
+}
+
+.flash_content {
+    height: 580px;
+    width: 980px;
+    display: none;
+}
