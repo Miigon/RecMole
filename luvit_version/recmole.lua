@@ -14,11 +14,7 @@ local conf={
 }
 _G.conf = conf
 
-require "./buffer_extension"
 require "./ressrv"
-require "./loginip"
-
-local _ = conf.trafficlogger and require "./loginserver/trafficloggerlogin" or require "./loginserver/login"
 
 --local gs = conf.trafficlogger and require "./gameserver/trafficlogger" or require "./gameserver/gameserver"
 --gs.GameServer:new()

@@ -70,7 +70,7 @@ if not missinglist then
 	print("\27[31mFailed to open missinglist.txt: ",err,"\27[0m")
 	os.exit();
 end
-ln = 0
+local ln = 0
 missinglist:seek("set");
 for line in missinglist:lines() do
 	ln = ln + 1
@@ -78,75 +78,6 @@ for line in missinglist:lines() do
 end
 print(ln.." lines of missinglist data has been loaded.")
 missinglist:seek("end");
-
-function tokenCharFunction()
-    local x = math.random(1,52)
-    if x <= 26 then --lowercase
-        return string.char(96 + x)
-    else -- uppercase
-        return string.char(64 + x - 26)
-    end
-end
-
-function generateToken()
-    local token = ""
-    for i=1,5 do
-        token = token .. tokenCharFunction()
-    end
-    return token
-end
-
-local userList = {}
-local sessionList = {}
-_G.sessionList = sessionList
-_G.userList = userList
-
-function loadUser(id)
-    if userList[id] == nil then
-        local amountText = fs.readFileSync(userdata_dir .. id)
-        local user = {amount = (tonumber(amountText) or 0)}
-        userList[id] = user
-        return user
-    else 
-        return userList[id]
-    end
-end
-
-local presigned_users = {}
-function _G.signSession(id)
-    local user = loadUser(id) 
-    local session = sessionList[presigned_users[id][1]]
-    if not session then return end
-    user.session = session
-    session.user = user
-    session.id = session.probableId
-    presigned_users[id] = nil
-    --p(sessionList)
-end
-
-function _G.presignSession(token,id)
-    local session = sessionList[token] 
-    if not session then return false end
-    session.probableId = id
-    presigned_users[id] = {token,token_initial_life}
-    return true
-end
-
-function verifySession(session)
-    return session and os.time() < session.start + session.life
-end
-
-function refreshSession(session)
-    session.life = keepalive_life
-    session.start = os.time()
-end
-
-function newToken()
-    local token
-    repeat token = generateToken() until sessionList[token] == nil
-    sessionList[token] = {start = os.time(),life = token_initial_life}
-    return token
-end
 
 local policy_file = "\
 <?xml version=\"1.0\"?><!DOCTYPE cross-domain-policy><cross-domain-policy>\
@@ -186,7 +117,7 @@ function Response.redirect(res,dest)
 end
 
 http.createServer(function(req, res)
-    req.uri = url.parse(req.url,true)
+    req.uri = url.parse(req.url)
     local dest = req.uri.pathname
     if dest == "/crossdomain.xml" then
         res:okText(policy_file)
@@ -198,58 +129,16 @@ http.createServer(function(req, res)
     end
     -- RecMole API
     if dest:sub(1,11) == "/recmoleapi" then
-        if dest == "/recmoleapi/new_token" then -- dont need a query
-            res:okText(newToken())
-        else -- need a query
-            local query = req.uri.query
-            if not query then 
-                return res:error("Invaild query.")
-            end
-            if dest == "/recmoleapi/get_amount_by_id" then
-                local id = tonumber(query["id"])
-                if type(id) ~= "number" then 
-                    return res:error("Invaild query.")
-                end
-                local user = loadUser(id)
-                if user == nil then 
-                    return res:error("User not found.")
-                end
-                res:okText(tostring(user.amount))
-            
-            elseif dest == "/recmoleapi/refresh_session" then
-                local token = tostring(query["token"])
-                if type(token) ~= "string" then 
-                    return res:error("Invaild query.")
-                end
-                local session = sessionList[token]
-                if not verifySession(session) then
-                    return res:error("Invaild token.")
-                end
-                refreshSession(session)
-                if session.id == nil then
-                    res:okText('null,0')
-                else
-                    local user = userList[session.id]
-                    res:okText(session.id..','..tostring(user.amount))
-                end
-            else
-                res:error("Invaild API.")
-            end
-            
+        if dest == "/recmoleapi/get_amount" then -- dont need a query
+            res:okText(tostring(ln))
+        else
+            res:error("Invaild API.")
         end
         return
     end
     local token
     if dest:sub(1,9) == "/rcmgame/" then
-        if #dest >= 15 then
-            token = dest:sub(10,14)
-            if not sessionList[token] then
-                return res:notFound(dest,"Invaild token.\n")
-            end
-            dest = dest:sub(15,-1)
-        else
-            return res:notFound(dest,"Invaild token.\n")
-        end
+        dest = dest:sub(10,-1)
         local path = joinPath(res_root,dest)
         --print("\27[1;37mAccess",dest,"\27[0m")
         local special_redirect_rule = special_redirect_rules[dest];
@@ -262,10 +151,7 @@ http.createServer(function(req, res)
                 print("\27[32mnew file:",dest,"\27[0m")
                 missinglist:write(dest,'\n')
                 duplist[dest] = true
-                if sessionList[token] and sessionList[token].user then
-                    local user = sessionList[token].user
-                    user.amount = user.amount + 1
-                end
+                ln = ln + 1
             end
             res:writeHead(307, {
                 ["Location"] = 'http://51mole.61.com'..dest,
@@ -281,21 +167,7 @@ http.createServer(function(req, res)
     end
 end):listen(conf.ressrv_port)
 
-function expired_session_cleaner()
-    local time = os.time()
-    for token,session in pairs(sessionList) do
-        if session.start + session.life <= time then
-            sessionList[token] = nil -- release session
-            if session.user and session.user.session == session then -- release user
-                fs.writeFileSync(userdata_dir .. session.id,tostring(session.user.amount))
-                userList[session.id] = nil
-            end
-        end
-    end
-end
-
 math.randomseed(os.time())
 
 timer.setInterval(flush_time_interval,function()missinglist:flush()end)
-timer.setInterval(token_cleaner_interval,expired_session_cleaner)
 print("\27[36mRedirect resource server started on \27[1mhttp://localhost:"..conf.ressrv_port.."/\27[0m")
