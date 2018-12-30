@@ -20,7 +20,7 @@ local no_redirect = 1
 local special_redirect_rules = {
     ["/"] = "/index.html",
     ["/index.html"] = no_redirect,
-    ["/config/Server.xml"] = no_redirect, -- 注释本行来直连官方服务器（绕过trafficloggerlogin）
+--    ["/config/Server.xml"] = no_redirect, -- 注释本行来直连官方服务器（绕过trafficloggerlogin）
     ["/crossdomain.xml"] = no_redirect,
     ["/missinglist.txt"] = no_redirect,
 }
