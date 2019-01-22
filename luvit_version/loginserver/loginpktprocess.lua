@@ -71,6 +71,11 @@ function lpp.makeGoodSrvList(servers)
     return lpp.makeSrvList(servers) .. tostring(meta)
 end
 
+function lpp.preparse(data)
+    local buf = buffer.Buffer:new(data)
+    return buf:readUInt32BE(1)
+end
+
 function lpp.parse(data,socket)
     local buf = buffer.Buffer:new(data)
     local length = math.min(buf:readUInt32BE(1),buf.length)

@@ -32,6 +32,8 @@ local server = net.createServer(function(client)
         print("Client read error: " .. err)
         client:close()
     end)
+    local buffer = ""
+    local expecting = 1
     client:on("data",function(data)
         --p("cli->srv",data)
         if data == "<policy-file-request/>\000" then
@@ -42,7 +44,17 @@ local server = net.createServer(function(client)
         if conf.passthru then
             ce:write(data)
         else
-            lpp.parse(data,client)
+            buffer = buffer .. data
+            while #buffer >= expecting do
+                expecting = lpp.preparse(buffer)
+                if #buffer >= expecting then
+                    local packet = buffer:sub(1,expecting)
+                    lpp.parse(packet,client)
+                    buffer = buffer:sub(expecting+1,-1)
+                    client:write(packet)
+                end
+                expecting = 1
+            end
         end
     end)
     --[[

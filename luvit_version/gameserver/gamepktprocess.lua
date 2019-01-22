@@ -304,7 +304,13 @@ function gpp.makeLimitInfo(userid,list)
     end
     return tostring(buf)
 end
-local databuf = ""
+
+
+function lpp.preparse(data)
+    local buf = buffer.Buffer:new(data)
+    return buf:readUInt32BE(1)
+end
+
 function gpp.parse(data,socket,user)
     local buf = buffer.Buffer:new(data)
     local length = math.min(buf:ruint(1),buf.length)
@@ -317,7 +323,6 @@ function gpp.parse(data,socket,user)
     local handler = gpp.handler[cmdId]
     if handler then
         handler(socket,userId,buf,length,user)
-        --p(getmetatable(socket))
     else
         print("\27[31mUnhandled packet:",cmdId,"with length",length  ,"\27[0m")
         --p(data)

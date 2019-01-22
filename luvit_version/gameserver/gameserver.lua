@@ -30,6 +30,9 @@ function gs:initialize(port)
     local server = net.createServer(function(client)
         print "Someone Connected to gameserver."
         allsocket[client] = {map=3,}
+        
+        local buffer = ""
+        local expecting = 1
         client:on("data",function(data)
             if data == "<policy-file-request/>\000" then
                 client:write(policy_file)
@@ -39,7 +42,17 @@ function gs:initialize(port)
             if conf.passthru then
                 ce:write(data)
             else
-                gpp.parse(data,client,allsocket[client])
+                buffer = buffer .. data
+                while #buffer >= expecting do
+                    expecting = gpp.preparse(buffer)
+                    if #buffer >= expecting then
+                        local packet = buffer:sub(1,expecting)
+                        gpp.parse(packet,client,allsocket[client])
+                        buffer = buffer:sub(expecting+1,-1)
+                        client:write(packet)
+                    end
+                    expecting = 1
+                end
             end
         end)
         client:on("end",function()
