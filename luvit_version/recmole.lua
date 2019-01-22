@@ -1,7 +1,8 @@
 -- RecMole Main
 
 local conf={
-    res_dir = "../res",
+    res_dir = "../gameres/root",
+    res_redirect_dir = "../gameres_redirect/root",
     ressrv_port = 32400,
     loginip_port = 32401,
     login_server_address = "127.0.0.1:32402",

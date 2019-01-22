@@ -3,8 +3,19 @@ local url = require "url"
 local fs = require "fs"
 local Response = http.ServerResponse
 local root = conf.res_dir
+local redirect_root = conf.res_redirect_dir
 local mimes = require "./mimes"
 mimes.default = "application/octet-stream"
+
+-- Redirection
+local REDIRECT = 1
+local IGNORE = nil
+local redirect_rules = 
+{
+    ["/index.html"] = REDIRECT,
+    ["/config/Server.xml"] = conf.res_official_address and IGNORE or REDIRECT,
+    ["/dll/ClientCommonDLL.swf"] = conf.res_bypass_encrypt and REDIRECT or IGNORE,
+}
 
 function getType(path)
     return mimes[path:lower():match("[^.]*$")] or mimes.default
@@ -67,13 +78,10 @@ end
 http.createServer(function(req, res)
     req.uri = url.parse(req.url)
     local dest = req.uri.pathname
-    if dest == "/config/Server.xml" and conf.res_official_address then
-        dest = "/config/Serveroffi.xml"
-    end
-    if dest == "/dll/ClientCommonDLL.swf" and not conf.res_bypass_encrypt then
-        dest = "/dll/ClientCommonDLLoffi.swf"
-    end
     local path = root .. dest
+    if redirect_rules[dest] == REDIRECT then
+        path = redirect_root .. dest
+    end
     
     print("\27[1;37mAccess",dest,"\27[0m")
     fs.stat(path, function (err, stat)

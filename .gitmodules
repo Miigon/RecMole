@@ -1,0 +1,3 @@
+[submodule "gameres"]
+	path = gameres
+	url = git@github.com:Miigon/RecMoleRes.git

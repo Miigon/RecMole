@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config>
+	<taomee MOUrl="127.0.0.1:32401" allversion="A=A0.30" regversion="B=B0.1" indexversion="C=C0.6"   uiversion="D=D0.1"  mapversion="E=E0.1" moduleversion="F=F0.1"/>
+	<Email ip="123.150.163.99" port="1863" />
+  	<DirSer ip="123.150.163.99" port="1863" />
+  	<RegistSer ip="114.80.98.7" port="1863" />
+  	<Visitor ip="123.150.163.99" port="1863" />
+	<GameSer ip="123.150.163.115" port="3200" />
+</config>
