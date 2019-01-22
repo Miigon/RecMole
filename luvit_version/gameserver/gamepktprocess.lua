@@ -306,7 +306,7 @@ function gpp.makeLimitInfo(userid,list)
 end
 
 
-function lpp.preparse(data)
+function gpp.preparse(data)
     local buf = buffer.Buffer:new(data)
     return buf:readUInt32BE(1)
 end
