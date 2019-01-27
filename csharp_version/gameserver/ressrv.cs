@@ -23,7 +23,7 @@ namespace gameserver
             listener.BeginGetContext(new AsyncCallback(GetContent_Callback), listener);
         }
 
-        void GetContent_Callback(IAsyncResult ar)
+        async void GetContent_Callback(IAsyncResult ar)
         {
             HttpListener listener = (HttpListener)ar.AsyncState;
             listener.BeginGetContext(new AsyncCallback(GetContent_Callback), listener);
@@ -44,9 +44,7 @@ namespace gameserver
                     {
                         res.ContentType = Mime.MIME[Path.GetExtension(filePath).TrimStart('.')];
                         res.ContentLength64 = fileStream.Length;
-                        Task task = fileStream.CopyToAsync(res.OutputStream);
-                        task.Wait();
-                        task.Dispose();
+                        await fileStream.CopyToAsync(res.OutputStream);
                     }
                     res.Close();
                     return;
@@ -65,88 +63,71 @@ namespace gameserver
             //请求官方
             Console.WriteLine("ressrv: proxy {0} ", conf["official_address"] + req.RawUrl);
             HttpWebRequest c_req = HttpWebRequest.CreateHttp(conf["official_address"] + req.RawUrl);
-            c_req.BeginGetResponse(new AsyncCallback((IAsyncResult c_ar) =>
+            HttpWebResponse c_res;
+            try
             {
-                HttpWebResponse c_res;
-                try
-                {
-                    c_res = (HttpWebResponse)c_req.EndGetResponse(c_ar);
-                }
-                catch (WebException e)
-                {
-                    c_res = (HttpWebResponse)e.Response;
-                    Console.WriteLine("ressrv: {0} {1} ", (int)c_res.StatusCode, c_res.ResponseUri);
-                    res.StatusCode = (int)c_res.StatusCode;
-                    res.Close();
-                    c_res.Dispose();
-                    return;
-                }
+                c_res = (HttpWebResponse)await c_req.GetResponseAsync();
+            }
+            catch (WebException e)
+            {
+                c_res = (HttpWebResponse)e.Response;
+                Console.WriteLine("ressrv: {0} {1} ", (int)c_res.StatusCode, c_res.ResponseUri);
+                res.StatusCode = (int)c_res.StatusCode;
+                res.Close();
+                c_res.Dispose();
+                return;
+            }
 
-                res.ContentLength64 = c_res.ContentLength;
-                res.ContentType = c_res.ContentType;
+            res.ContentLength64 = c_res.ContentLength;
+            res.ContentType = c_res.ContentType;
 
-                Stream c_stream = c_res.GetResponseStream();
-                Stream s_stream = res.OutputStream;
+            Stream c_stream = c_res.GetResponseStream();
+            Stream s_stream = res.OutputStream;
 
-                string dirName = Path.GetDirectoryName(filePath);
-                if (!Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
-
-                //将代理官方的内容写入本地文件，可能发生同时写入冲突
-                int i = 0;
-                string tmpFile = filePath + "." + i + ".tmp";
-                while (File.Exists(tmpFile))
-                {
-                    tmpFile = filePath + "." + i + ".tmp";
-                    i++;
-                }
-
-                FileStream f_stream = null;
-                try
-                {
-                    f_stream = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                }
-                catch (IOException)
-                {
-                    //throw;
-                }
+            string dirName = Path.GetDirectoryName(filePath);
+            if (!Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
 
 
-                //start copy
-                byte[] buffer = new byte[4096];
-                Int64 loopCount = 0;
-                while (loopCount < c_res.ContentLength)
-                {
-                    int count = c_stream.Read(buffer, 0, buffer.Length);
-                    loopCount += count;
-                    //返回给client
-                    Task s_task = s_stream.WriteAsync(buffer, 0, count);
-                    if (f_stream != null)
-                    {
-                        //存入本地
-                        Task f_task = f_stream.WriteAsync(buffer, 0, count);
-                        f_task.Wait();
-                        f_task.Dispose();
-                    }
-                    s_task.Wait();  //todo 500
-                    s_task.Dispose();
+            FileStream f_stream = null;
+            try
+            {
+                f_stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            }
+            catch (IOException)
+            {
+                //throw;
+            }
 
-
-                }
+            //start copy
+            byte[] buffer = new byte[4096];
+            Int64 loopCount = 0;
+            while (loopCount < c_res.ContentLength)
+            {
+                int count = await c_stream.ReadAsync(buffer, 0, buffer.Length);
+                loopCount += count;
+                //返回给client
+                await s_stream.WriteAsync(buffer, 0, count);
                 if (f_stream != null)
                 {
-                    f_stream.Close();
-                    f_stream.Dispose();
-                    System.IO.File.Move(tmpFile , filePath);
-                    Console.WriteLine("ressrv: Cached {0}", filePath);
+                    //存入本地
+                    await f_stream.WriteAsync(buffer, 0, count);
                 }
-                c_stream.Close();
-                c_stream.Dispose();
-                s_stream.Close();
-                s_stream.Dispose();
-                c_res.Close();
-                c_res.Dispose();
-                res.Close();
-            }), c_req);
+                //TODO tcp rst 500
+
+            }
+            if (f_stream != null)
+            {
+                f_stream.Close();
+                f_stream.Dispose();
+                Console.WriteLine("ressrv: Cached {0}", req.Url.AbsolutePath);
+            }
+            c_stream.Close();
+            c_stream.Dispose();
+            s_stream.Close();
+            s_stream.Dispose();
+            c_res.Close();
+            c_res.Dispose();
+            res.Close();
 
 
             #endregion
