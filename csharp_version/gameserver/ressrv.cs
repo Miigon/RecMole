@@ -52,8 +52,8 @@ namespace gameserver
                 catch (IOException e)
                 {
                     Console.WriteLine("ressrv: Cache IOException {0}\r\n{1}", req.RawUrl, e.Message);
-                    res.StatusCode = 500;
-                    res.Close();
+                    //res.StatusCode = 500;
+                    //res.Close();
                     //throw;
                 }
             }
@@ -101,33 +101,48 @@ namespace gameserver
             //start copy
             byte[] buffer = new byte[4096];
             Int64 loopCount = 0;
-            while (loopCount < c_res.ContentLength)
+            try
             {
-                int count = await c_stream.ReadAsync(buffer, 0, buffer.Length);
-                loopCount += count;
-                //返回给client
-                await s_stream.WriteAsync(buffer, 0, count);
+                while (loopCount < c_res.ContentLength)
+                {
+                    int count = await c_stream.ReadAsync(buffer, 0, buffer.Length);
+                    loopCount += count;
+                    //返回给client
+                    await s_stream.WriteAsync(buffer, 0, count);
+                    if (f_stream != null)
+                    {
+                        //存入本地
+                        await f_stream.WriteAsync(buffer, 0, count);
+                    }
+                    //TODO tcp rst 500
+
+                }
                 if (f_stream != null)
                 {
-                    //存入本地
-                    await f_stream.WriteAsync(buffer, 0, count);
+                    f_stream.Close();
+                    f_stream.Dispose();
+                    Console.WriteLine("ressrv: Cached {0}", req.Url.AbsolutePath);
                 }
-                //TODO tcp rst 500
-
             }
-            if (f_stream != null)
+            catch (Exception)
+            {
+
+                //throw;
+            }
+            finally
             {
                 f_stream.Close();
                 f_stream.Dispose();
-                Console.WriteLine("ressrv: Cached {0}", req.Url.AbsolutePath);
+                File.Delete(filePath);
+                c_stream.Close();
+                c_stream.Dispose();
+                s_stream.Close();
+                s_stream.Dispose();
+                c_res.Close();
+                c_res.Dispose();
+                res.Close();
             }
-            c_stream.Close();
-            c_stream.Dispose();
-            s_stream.Close();
-            s_stream.Dispose();
-            c_res.Close();
-            c_res.Dispose();
-            res.Close();
+
 
 
             #endregion
