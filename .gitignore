@@ -1,2 +1,4 @@
 
 *.exe
+/csharp_version/tools/Properties/launchSettings.json
+/csharp_version/gameserver/Properties/PublishProfiles/FolderProfile.pubxml
