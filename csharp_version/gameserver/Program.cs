@@ -11,6 +11,7 @@ namespace gameserver
             string str_conf = System.IO.File.ReadAllText("config.json");
             JObject conf = JObject.Parse(str_conf);
             ressrv ressrv = new ressrv(conf);
+            loginip loginip = new loginip(conf);
 
             Console.WriteLine("Hello World!");
             while (true)
