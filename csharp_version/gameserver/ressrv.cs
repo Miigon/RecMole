@@ -176,13 +176,19 @@ namespace gameserver
         {
             switch (url)
             {
-                case "/index.html":
-                    return true;
                 case "/config/Server.xml":
                     return !this.conf["res_official_address"].ToObject<bool>();
                 case "/dll/ClientCommonDLL.swf":
                     return this.conf["res_bypass_encrypt"].ToObject<bool>();
                 default:
+                    string[] redirect_rules = this.conf["redirect_rules"].ToObject<string[]>();
+                    foreach (string rule in redirect_rules)
+                    {
+                        if (url == rule)
+                        {
+                            return true;
+                        }
+                    }
                     return false;
             }
         }
