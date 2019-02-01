@@ -14,17 +14,23 @@ namespace gameserver
     {
         HttpListener listener = new HttpListener();
         JObject conf;
+        AsyncCallback GetContent;
+
         public ressrv(JObject conf)
         {
             this.conf = conf;
+            GetContent = new AsyncCallback(GetContent_Callback);
+
             listener.Prefixes.Add(conf["ressrv_bind"].ToString());
             listener.Start();
             Console.WriteLine("ressrv: Listening at " + conf["ressrv_bind"].ToString());
-            listener.BeginGetContext(new AsyncCallback(GetContent_Callback), listener);
+            listener.BeginGetContext(GetContent, listener);
         }
 
         async void GetContent_Callback(IAsyncResult ar)
         {
+            listener.BeginGetContext(GetContent, listener);
+
             HttpListenerContext context = listener.EndGetContext(ar);
             HttpListenerRequest req = context.Request;
             using (HttpListenerResponse res = context.Response)
