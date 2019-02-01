@@ -39,6 +39,7 @@ namespace gameserver
                 //重定向
                 if (redirect_rules(req.Url.AbsolutePath))
                 {
+                    Console.WriteLine("ressrv: redir {0}", req.Url.AbsolutePath);
                     filePath = conf["res_redirect_dir"].ToString() + req.Url.AbsolutePath;
                 }
                 else
@@ -125,7 +126,15 @@ namespace gameserver
                         }
                         catch (Exception e)
                         {
-                            File.Delete(filePath);
+                            if (f_stream != null)
+                            {
+                                lock (FileDelete_lock)
+                                {
+                                    f_stream.Close();
+                                    File.Delete(filePath);
+                                }
+                                f_stream.Dispose();
+                            }
                             Console.WriteLine("ressrv: Error {0}", e.Message);
                             res.Abort();
                         }
@@ -144,6 +153,7 @@ namespace gameserver
             #endregion
         }
 
+        static object FileDelete_lock;
 
         async Task CopyStreamAsync(Stream source, Stream dest, FileStream file = null)
         {
