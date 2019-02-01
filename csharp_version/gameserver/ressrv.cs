@@ -25,129 +25,167 @@ namespace gameserver
 
         async void GetContent_Callback(IAsyncResult ar)
         {
-            HttpListener listener = (HttpListener)ar.AsyncState;
-            listener.BeginGetContext(new AsyncCallback(GetContent_Callback), listener);
             HttpListenerContext context = listener.EndGetContext(ar);
-
             HttpListenerRequest req = context.Request;
-            HttpListenerResponse res = context.Response;
-
-            string filePath = conf["res_dir"].ToString() + req.Url.AbsolutePath;
-
-            if (System.IO.File.Exists(filePath))
+            using (HttpListenerResponse res = context.Response)
             {
-                //命中本地缓存
-                Console.WriteLine("ressrv: HitCache {0} ", req.RawUrl);
+                string filePath;
+                //重定向
+                if (redirect_rules(req.Url.AbsolutePath))
+                {
+                    filePath = conf["res_redirect_dir"].ToString() + req.Url.AbsolutePath;
+                }
+                else
+                {
+                    filePath = conf["res_dir"].ToString() + req.Url.AbsolutePath;
+                }
+
+                //本地缓存
+                if (System.IO.File.Exists(filePath))
+                {
+                    //命中本地缓存
+                    Console.WriteLine("ressrv: HitCache {0} ", req.RawUrl);
+                    try
+                    {
+                        await SendFileAsync(res, filePath);
+                        res.Close();
+                        return;
+                    }
+                    catch (IOException e)
+                    {
+                        Console.WriteLine("ressrv: Cache IOException {0}\r\n{1}", req.RawUrl, e.Message);
+                    }
+                }
+
+                #region 请求官方
+                //请求官方
+                Console.WriteLine("ressrv: proxy {0} ", conf["official_address"] + req.RawUrl);
+                HttpWebRequest c_req = HttpWebRequest.CreateHttp(conf["official_address"] + req.RawUrl);
+                HttpWebResponse c_res = null;
+
+                //尝试连接官方获取c_res对象
                 try
                 {
-                    using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    c_res = (HttpWebResponse)await c_req.GetResponseAsync();
+                }
+                catch (WebException e)
+                {
+                    if (e.Response != null)
                     {
-                        res.ContentType = Mime.MIME[Path.GetExtension(filePath).TrimStart('.')];
-                        res.ContentLength64 = fileStream.Length;
-                        await fileStream.CopyToAsync(res.OutputStream);
+                        HttpWebResponse e_res = (HttpWebResponse)e.Response;
+                        Console.WriteLine("ressrv: {0} {1} ", (int)e_res.StatusCode, e_res.ResponseUri);
+                        res.StatusCode = (int)e_res.StatusCode;
+                        e_res.Dispose();
+                    }
+                    else
+                    {
+                        Console.WriteLine("ressrv: 502 {0}", e.Message);
+                        res.StatusCode = 502;
                     }
                     res.Close();
                     return;
                 }
-                catch (IOException e)
+                using (c_res)
                 {
-                    Console.WriteLine("ressrv: Cache IOException {0}\r\n{1}", req.RawUrl, e.Message);
-                    //res.StatusCode = 500;
-                    //res.Close();
-                    //throw;
-                }
-            }
+                    res.ContentLength64 = c_res.ContentLength;
+                    res.ContentType = c_res.ContentType;
 
-            #region 请求官方
-
-            //请求官方
-            Console.WriteLine("ressrv: proxy {0} ", conf["official_address"] + req.RawUrl);
-            HttpWebRequest c_req = HttpWebRequest.CreateHttp(conf["official_address"] + req.RawUrl);
-            HttpWebResponse c_res;
-            try
-            {
-                c_res = (HttpWebResponse)await c_req.GetResponseAsync();
-            }
-            catch (WebException e)
-            {
-                c_res = (HttpWebResponse)e.Response;
-                Console.WriteLine("ressrv: {0} {1} ", (int)c_res.StatusCode, c_res.ResponseUri);
-                res.StatusCode = (int)c_res.StatusCode;
-                res.Close();
-                c_res.Dispose();
-                return;
-            }
-
-            res.ContentLength64 = c_res.ContentLength;
-            res.ContentType = c_res.ContentType;
-
-            Stream c_stream = c_res.GetResponseStream();
-            Stream s_stream = res.OutputStream;
-
-            string dirName = Path.GetDirectoryName(filePath);
-            if (!Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
-
-
-            FileStream f_stream = null;
-            try
-            {
-                f_stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            }
-            catch (IOException)
-            {
-                //throw;
-            }
-
-            //start copy
-            byte[] buffer = new byte[4096];
-            Int64 loopCount = 0;
-            try
-            {
-                while (loopCount < c_res.ContentLength)
-                {
-                    int count = await c_stream.ReadAsync(buffer, 0, buffer.Length);
-                    loopCount += count;
-                    //返回给client
-                    await s_stream.WriteAsync(buffer, 0, count);
-                    if (f_stream != null)
+                    //尝试获取文件流
+                    FileStream f_stream = null;
+                    try
                     {
-                        //存入本地
-                        await f_stream.WriteAsync(buffer, 0, count);
+                        string dirName = Path.GetDirectoryName(filePath);
+                        if (!Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
+                        f_stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
                     }
-                    //TODO tcp rst 500
+                    catch (IOException)
+                    {
+                        //throw;
+                    }
 
+                    //start copy
+                    using (Stream c_stream = c_res.GetResponseStream(), s_stream = res.OutputStream)
+                    {
+                        try
+                        {
+                            await CopyStreamAsync(c_stream, s_stream, f_stream);
+                            //dispose f_stream
+                            if (f_stream != null)
+                            {
+                                f_stream.Close();
+                                f_stream.Dispose();
+                                Console.WriteLine("ressrv: Cached {0}", req.Url.AbsolutePath);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            File.Delete(filePath);
+                            Console.WriteLine("ressrv: Error {0}", e.Message);
+                            res.Abort();
+                        }
+                        finally
+                        {
+                            s_stream.Close();
+                            c_stream.Close();
+                        }
+                    }
+                    c_res.Close();
                 }
-                if (f_stream != null)
-                {
-                    f_stream.Close();
-                    f_stream.Dispose();
-                    Console.WriteLine("ressrv: Cached {0}", req.Url.AbsolutePath);
-                }
-            }
-            catch (Exception)
-            {
-
-                //throw;
-            }
-            finally
-            {
-                f_stream.Close();
-                f_stream.Dispose();
-                File.Delete(filePath);
-                c_stream.Close();
-                c_stream.Dispose();
-                s_stream.Close();
-                s_stream.Dispose();
-                c_res.Close();
-                c_res.Dispose();
                 res.Close();
+
             }
-
-
 
             #endregion
+        }
 
 
+        async Task CopyStreamAsync(Stream source, Stream dest, FileStream file = null)
+        {
+            byte[] buffer = new byte[4096];
+            int count = 0;
+            do
+            {
+                count = await source.ReadAsync(buffer, 0, buffer.Length);
+                //返回给client
+                await dest.WriteAsync(buffer, 0, count);
+                if (file != null)
+                {
+                    //存入本地
+                    await file.WriteAsync(buffer, 0, count);
+                }
+            } while (count > 0);
+
+        }
+
+        async Task SendFileAsync(HttpListenerResponse res, string filePath)
+        {
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                res.ContentType = Mime.MIME[Path.GetExtension(filePath).TrimStart('.')];
+                res.ContentLength64 = fileStream.Length;
+                using (Stream stream = res.OutputStream)
+                {
+                    await fileStream.CopyToAsync(res.OutputStream);
+                    stream.Close();
+                }
+                fileStream.Close();
+            }
+        }
+
+        bool redirect_rules(string url)
+        {
+            switch (url)
+            {
+                case "/index.html":
+                    return true;
+                case "/config/Server.xml":
+                    return !this.conf["res_official_address"].ToObject<bool>();
+                case "/dll/ClientCommonDLL.swf":
+                    return this.conf["res_bypass_encrypt"].ToObject<bool>();
+                default:
+                    return false;
+            }
         }
     }
 }
+
