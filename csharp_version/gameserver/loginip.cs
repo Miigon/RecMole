@@ -12,17 +12,23 @@ namespace gameserver
     {
         HttpListener listener = new HttpListener();
         JObject conf;
+        AsyncCallback GetContent;
+
         public loginip(JObject conf)
         {
             this.conf = conf;
-            listener.Prefixes.Add(conf["ressrv_bind"].ToString());
+            GetContent = new AsyncCallback(GetContent_Callback);
+
+            listener.Prefixes.Add(conf["loginip_bind"].ToString());
             listener.Start();
-            Console.WriteLine("loginip: Listening at " + conf["ressrv_bind"].ToString());
-            listener.BeginGetContext(new AsyncCallback(GetContent_Callback), listener);
+            Console.WriteLine("loginsrv: Listening at " + conf["loginip_bind"].ToString());
+            listener.BeginGetContext(GetContent, listener);
         }
 
         async void GetContent_Callback(IAsyncResult ar)
         {
+            listener.BeginGetContext(GetContent, listener);
+
             HttpListenerContext context = listener.EndGetContext(ar);
             HttpListenerRequest req = context.Request;
             using (HttpListenerResponse res = context.Response)
