@@ -1,12 +1,10 @@
 -- Login Server
 
-CONN_OFFI_LS = false
-
 local net = require "net"
 local lpp = require "./loginpktprocess"
 local ce
 local ccc
-if CONN_OFFI_LS then
+if conf.passthru then
     ce = net.createConnection(1863, '123.206.131.236', function (err)
     if err then error(err) end
 
@@ -51,7 +49,6 @@ local server = net.createServer(function(client)
                     local packet = buffer:sub(1,expecting)
                     lpp.parse(packet,client)
                     buffer = buffer:sub(expecting+1,-1)
-                    client:write(packet)
                 end
                 expecting = 1
             end

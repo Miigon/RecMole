@@ -3,7 +3,10 @@
 CONN_OFFI_GS = false
 
 gs = require "core".Object:extend()
-local gpp = require "./gamepktprocess"
+local Game = require "./game"
+local Map = require "./map"
+local gpp = require "./gamepktprotocol" -- must load AFTER Game and Map to avoid recursive requirement issues
+gpp.initLibs()
 local net = require "net"
 
 local policy_file = "\
@@ -29,7 +32,8 @@ end
 function gs:initialize(port)
     local server = net.createServer(function(client)
         print "Someone Connected to gameserver."
-        allsocket[client] = {map=3,}
+        allsocket[client] = Game.newUser()
+        allsocket[client].socket = client
         
         local buffer = ""
         local expecting = 1
@@ -44,18 +48,18 @@ function gs:initialize(port)
             else
                 buffer = buffer .. data
                 while #buffer >= expecting do
-                    expecting = gpp.preparse(buffer)
+                    expecting = gpp.preparse(buffer:sub(1,4))
                     if #buffer >= expecting then
                         local packet = buffer:sub(1,expecting)
                         gpp.parse(packet,client,allsocket[client])
                         buffer = buffer:sub(expecting+1,-1)
-                        client:write(packet)
                     end
                     expecting = 1
                 end
             end
         end)
         client:on("end",function()
+            Game.endUser(allsocket[client])
             allsocket[client] = nil
         end)
         ccc = client
@@ -79,7 +83,6 @@ function gpp.broadcast(data,when)
         end
     else
         for k,_ in pairs(allsocket) do
-            p(k);
             k:write(data)
         end
     end

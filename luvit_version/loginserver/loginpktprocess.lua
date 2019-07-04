@@ -17,7 +17,7 @@ function lpp.makeHead(cmdId,userId,errorId,bodylen)
 end
 
 function lpp.makeLoginBody(session)
-    return "\0\0\0\0"..session.."\0\0\0\0"
+    return "\0\0\0\0"..session.."\000\000\000\001"
 end
 
 local function createSrvList(buf,srvs)
