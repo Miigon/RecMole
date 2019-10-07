@@ -1,0 +1,7 @@
+class LoginCmd:
+    GET_AUTHCODE = 101
+    LOGIN = 103
+    GET_GOOD_SERVER_LIST = 105
+    GET_SERVER_LIST = 106
+    CREATE_MOLE = 107
+    
