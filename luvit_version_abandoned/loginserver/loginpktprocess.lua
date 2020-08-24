@@ -27,6 +27,7 @@ local function createSrvList(buf,srvs)
         buf:writeUInt32BE(offset+1,srvs[i].id)
         buf:writeUInt32BE(offset+5,srvs[i].userCount)
         local ip = srvs[i].ip
+        -- append \0 to the end to make it 16byte long
         for j=1,16 do
             if j <= #ip then
                 buf:writeUInt8(offset+8+j,ip:byte(j))
@@ -122,7 +123,6 @@ end
 
 -- CMD_GET_SERVER_LIST
 lpp.handler[106] = function(socket,userId,buf,length)
-    local session = buf:toString(offset+1,offset+16)
     local body = lpp.makeSrvList(srv.getServerList())
     socket:write(lpp.makeHead(106,userId,0,#body))
     socket:write(body)

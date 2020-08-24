@@ -16,6 +16,8 @@ local conf={
 }
 _G.conf = conf
 
+-- Before the RecMole Alpha resource server is implemented, this old resource server will be used
+-- Gameserver will be disabled and should instead be served by the RecMole Alpha
 require "./buffer_extension"
 require "./ressrv"
 require "./loginip"
